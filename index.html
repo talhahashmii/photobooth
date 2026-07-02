@@ -292,7 +292,17 @@
   }
 
   function setupPeer(onOpen){
-    peer = new Peer(undefined, { debug: 0 });
+    peer = new Peer(undefined, {
+      debug: 0,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+        ]
+      }
+    });
     peer.on('open', function(id){ onOpen(id); });
     peer.on('error', function(err){
       console.error(err);
@@ -380,6 +390,11 @@
           wireDataConnection();
           call = peer.call(remotePeerId, localStream);
           call.on('stream', function(stream){ onRemoteStream(stream); });
+          setTimeout(function(){
+            if(!conn || !conn.open){
+              showError('Could not connect after 20 seconds. Make sure the other person still has the booth open, then ask them to send you a fresh link and try again.');
+            }
+          }, 20000);
         });
       }catch(err){
         showError('Could not access your camera. Check your browser permissions and try again.');
