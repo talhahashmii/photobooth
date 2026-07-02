@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duo Photo Booth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Special+Elite&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --curtain-dark:#2b0f14;
+    --curtain-mid:#3d1620;
+    --paper:#f3e9d2;
+    --paper-shadow:#e0d1ac;
+    --gold:#c9a227;
+    --gold-bright:#e8c14f;
+    --flash-red:#b23a2f;
+    --ink:#2a221c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--curtain-dark);font-family:'Jost',sans-serif;color:var(--paper);overflow-x:hidden;}
+  body{
+    background-image:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 18px, rgba(255,255,255,0.02) 18px, rgba(255,255,255,0.02) 36px),
+      radial-gradient(ellipse at top, var(--curtain-mid) 0%, var(--curtain-dark) 70%);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 60px;
+  }
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
+
+  .marquee{position:relative;margin:8px 0 24px;padding:14px 34px;background:linear-gradient(180deg,#1c0a0d,#150708);border:3px solid var(--gold);border-radius:8px;box-shadow:0 6px 0 rgba(0,0,0,0.4), 0 0 30px rgba(201,162,39,0.15);}
+  .marquee h1{margin:0;font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,5.5vw,40px);letter-spacing:5px;color:var(--gold-bright);text-shadow:0 0 8px rgba(232,193,79,0.5);text-align:center;}
+  .marquee .bulbs{position:absolute;inset:0;pointer-events:none;}
+  .bulb{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gold-bright);box-shadow:0 0 6px 2px rgba(232,193,79,0.7);animation:twinkle 1.6s infinite ease-in-out;}
+  @keyframes twinkle{0%,100%{opacity:1;}50%{opacity:0.25;}}
+
+  .stage{width:100%;max-width:720px;display:flex;flex-direction:column;align-items:center;}
+
+  .card{
+    width:100%;
+    background:linear-gradient(180deg,#4a2a1a,#3a1f13);
+    border-radius:18px;
+    padding:22px;
+    box-shadow:inset 0 0 0 3px var(--gold), inset 0 0 0 6px rgba(0,0,0,0.3), 0 14px 30px rgba(0,0,0,0.5);
+    text-align:center;
+  }
+  .card p{font-family:'Special Elite',monospace;font-size:13px;color:var(--paper-shadow);line-height:1.6;}
+  .card h2{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;color:var(--gold-bright);font-size:22px;margin:0 0 10px;}
+
+  .link-box{
+    display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
+    background:rgba(0,0,0,0.3); border:1px dashed rgba(201,162,39,0.5); border-radius:8px;
+    padding:12px; margin:16px 0; word-break:break-all;
+  }
+  .link-box code{font-family:'Special Elite',monospace;font-size:11px;color:var(--gold-bright);}
+
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--flash-red);margin-right:6px;animation:pulse-dot 1.2s infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .status-dot.ok{background:#5fae6f;animation:none;}
+
+  button.btn{font-family:'Special Elite',monospace;font-size:13px;letter-spacing:1px;padding:12px 22px;border-radius:8px;border:none;cursor:pointer;transition:transform 0.12s ease;}
+  button.btn:hover{transform:translateY(-2px);}
+  button.btn:active{transform:translateY(0);}
+  button.btn:focus-visible{outline:3px solid var(--gold-bright);outline-offset:2px;}
+  button.btn.primary{background:var(--flash-red);color:#fff;box-shadow:0 4px 0 #7c2419;}
+  button.btn.primary:active{box-shadow:0 1px 0 #7c2419;transform:translateY(3px);}
+  button.btn.gold{background:var(--gold);color:var(--ink);box-shadow:0 4px 0 #8a6c15;}
+  button.btn.gold:active{box-shadow:0 1px 0 #8a6c15;transform:translateY(3px);}
+  button.btn.ghost{background:transparent;color:var(--paper);border:1px solid rgba(243,233,210,0.4);}
+  button.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:16px;width:100%;}
+
+  .caption-field{width:100%;text-align:center;margin-bottom:16px;}
+  .caption-field label{display:block;font-family:'Special Elite',monospace;font-size:12px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:6px;}
+  .caption-field input{width:100%;max-width:320px;background:rgba(255,255,255,0.06);border:1px solid rgba(201,162,39,0.5);border-radius:6px;padding:8px 12px;color:var(--paper);font-family:'Jost',sans-serif;font-size:14px;text-align:center;}
+  .caption-field input:focus{outline:2px solid var(--gold-bright);outline-offset:2px;}
+
+  /* Duo booth */
+  .duo-booth{
+    position:relative; width:100%;
+    background:linear-gradient(180deg,#4a2a1a,#3a1f13);
+    border-radius:18px; padding:16px;
+    box-shadow:inset 0 0 0 3px var(--gold), inset 0 0 0 6px rgba(0,0,0,0.3), 0 14px 30px rgba(0,0,0,0.5);
+  }
+  .panes{display:flex;gap:10px;width:100%;}
+  .pane{
+    position:relative; flex:1; aspect-ratio:3/4; background:#000; border-radius:10px; overflow:hidden; border:2px solid #1c1c1c;
+  }
+  .pane video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1);}
+  .pane .label{
+    position:absolute; bottom:8px; left:8px;
+    background:rgba(0,0,0,0.55); padding:4px 9px; border-radius:20px;
+    font-family:'Special Elite',monospace; font-size:10px; letter-spacing:1px; z-index:5;
+  }
+  .pane .placeholder{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center;
+    font-family:'Special Elite',monospace; font-size:12px; color:var(--paper-shadow); padding:16px;
+  }
+  .shot-counter{position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);padding:4px 9px;border-radius:20px;font-family:'Special Elite',monospace;font-size:11px;z-index:5;}
+  .countdown-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);font-family:'Bebas Neue',sans-serif;font-size:80px;color:#fff;text-shadow:0 0 20px rgba(0,0,0,0.6);z-index:6;opacity:0;}
+  .countdown-overlay.show{animation:count-pop 1s ease-out;}
+  @keyframes count-pop{0%{opacity:0;transform:scale(0.6);}20%{opacity:1;transform:scale(1.1);}40%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1);}}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:7;pointer-events:none;}
+  .flash.go{animation:flashpop 0.35s ease-out;}
+  @keyframes flashpop{0%{opacity:0;}15%{opacity:1;}100%{opacity:0;}}
+
+  .booth-message{text-align:center;font-family:'Special Elite',monospace;font-size:13px;color:var(--paper-shadow);padding:14px 10px 4px;line-height:1.5;}
+
+  /* Duo strip */
+  .strip-wrap{display:flex;flex-direction:column;align-items:center;margin-top:6px;}
+  canvas#stripCanvas{max-width:100%;width:280px;height:auto;filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5));}
+
+  .gallery-toggle{margin-top:26px;background:none;border:none;color:var(--gold);font-family:'Special Elite',monospace;font-size:12px;letter-spacing:1.5px;cursor:pointer;text-decoration:underline;}
+  .gallery{width:100%;max-width:700px;margin-top:18px;padding-top:18px;border-top:1px dashed rgba(201,162,39,0.4);display:none;}
+  .gallery.show{display:block;}
+  .gallery h2{font-family:'Bebas Neue',sans-serif;letter-spacing:3px;color:var(--gold-bright);font-size:20px;text-align:center;margin:0 0 4px;}
+  .gallery-empty{text-align:center;font-family:'Special Elite',monospace;font-size:12px;color:var(--paper-shadow);padding:20px 10px;}
+  .gallery-scroll{display:flex;gap:18px;overflow-x:auto;padding:20px 10px 10px;}
+  .gallery-item{flex:0 0 auto;position:relative;text-align:center;}
+  .gallery-item .peg{font-size:20px;position:absolute;top:-14px;left:50%;transform:translateX(-50%) rotate(-6deg);}
+  .gallery-item img{width:110px;border-radius:2px;box-shadow:0 8px 16px rgba(0,0,0,0.5);cursor:pointer;background:var(--paper);}
+  .gallery-item .del{display:block;margin:6px auto 0;font-family:'Special Elite',monospace;font-size:10px;color:var(--paper-shadow);background:none;border:none;text-decoration:underline;cursor:pointer;}
+
+  .footer-note{margin-top:26px;font-family:'Special Elite',monospace;font-size:11px;color:rgba(243,233,210,0.35);text-align:center;max-width:380px;}
+  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+  @media (max-width:480px){
+    .panes{flex-direction:column;}
+    .pane{aspect-ratio:4/3;}
+  }
+</style>
+</head>
+<body>
+
+<div class="marquee">
+  <div class="bulbs" id="bulbs"></div>
+  <h1>Duo Photo Booth</h1>
+</div>
+
+<div class="stage">
+
+  <!-- LANDING -->
+  <div class="card" id="landingCard">
+    <h2>Start a session</h2>
+    <p>Open a booth, share the link with your partner, and once they join you'll both show up side by side, live.</p>
+    <div class="controls">
+      <button class="btn primary" id="createBtn">Open a booth</button>
+    </div>
+  </div>
+
+  <!-- WAITING (host) -->
+  <div class="card" id="waitingCard" style="display:none;">
+    <h2><span class="status-dot" id="waitDot"></span>Waiting for your partner</h2>
+    <p>Send this link. As soon as they open it, you'll both connect.</p>
+    <div class="link-box">
+      <code id="shareLink">—</code>
+      <button class="btn gold" id="copyLinkBtn">Copy link</button>
+    </div>
+  </div>
+
+  <!-- CONNECTING (guest) -->
+  <div class="card" id="connectingCard" style="display:none;">
+    <h2><span class="status-dot" id="connectDot"></span>Connecting…</h2>
+    <p id="connectingMsg">Joining the booth. This only takes a second.</p>
+  </div>
+
+  <!-- ERROR -->
+  <div class="card" id="errorCard" style="display:none;">
+    <h2>Something went sideways</h2>
+    <p id="errorMsg">Could not connect. Try refreshing, or check that you're both online.</p>
+    <div class="controls">
+      <button class="btn ghost" id="retryBtn">Start over</button>
+    </div>
+  </div>
+
+  <!-- DUO BOOTH -->
+  <div id="boothWrap" style="display:none;width:100%;">
+    <div class="caption-field">
+      <label for="captionInput">Strip caption</label>
+      <input id="captionInput" type="text" value="Talha &amp; Sabayna" maxlength="40">
+    </div>
+
+    <div class="duo-booth">
+      <div class="panes">
+        <div class="pane" id="localPane">
+          <video id="localVideo" autoplay playsinline muted></video>
+          <div class="label">You</div>
+          <div class="countdown-overlay" id="countdownOverlay">3</div>
+          <div class="flash" id="flashEl"></div>
+          <div class="shot-counter" id="shotCounter">0 / 4</div>
+        </div>
+        <div class="pane" id="remotePane">
+          <div class="placeholder" id="remotePlaceholder">Waiting for their camera…</div>
+          <video id="remoteVideo" autoplay playsinline style="display:none;"></video>
+          <div class="label">Them</div>
+        </div>
+      </div>
+
+      <div class="booth-message" id="boothMessage">Both cameras are live. Whenever you're ready, start the countdown.</div>
+
+      <div class="controls">
+        <button class="btn primary" id="startBtn">Start the countdown</button>
+      </div>
+    </div>
+
+    <div class="strip-wrap" id="stripWrap" style="display:none;">
+      <canvas id="stripCanvas"></canvas>
+      <div class="controls">
+        <button class="btn gold" id="downloadBtn">Download strip</button>
+        <button class="btn gold" id="saveBtn">Save to gallery</button>
+        <button class="btn ghost" id="retakeBtn">Take another</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="gallery-toggle" id="galleryToggle">View the gallery</button>
+  <div class="gallery" id="gallery">
+    <h2>The Gallery</h2>
+    <div id="galleryBody"><div class="gallery-empty">No strips saved yet on this device.</div></div>
+  </div>
+
+  <div class="footer-note">Video runs directly between your two browsers — nothing is uploaded or stored on a server. Works best when you're both online at the same time.</div>
+</div>
+
+<canvas id="workCanvas" class="visually-hidden"></canvas>
+
+<script>
+(function(){
+  // marquee bulbs
+  var bulbs = document.getElementById('bulbs');
+  for(var i=0;i<14;i++){
+    var b = document.createElement('div');
+    b.className='bulb';
+    b.style.left=(i/13*100)+'%';
+    if(i%2===0) b.style.top='-4px'; else b.style.bottom='-4px';
+    b.style.animationDelay=(i*0.13)+'s';
+    bulbs.appendChild(b);
+  }
+
+  var landingCard=document.getElementById('landingCard');
+  var waitingCard=document.getElementById('waitingCard');
+  var connectingCard=document.getElementById('connectingCard');
+  var errorCard=document.getElementById('errorCard');
+  var errorMsg=document.getElementById('errorMsg');
+  var boothWrap=document.getElementById('boothWrap');
+  var createBtn=document.getElementById('createBtn');
+  var shareLink=document.getElementById('shareLink');
+  var copyLinkBtn=document.getElementById('copyLinkBtn');
+  var retryBtn=document.getElementById('retryBtn');
+  var localVideo=document.getElementById('localVideo');
+  var remoteVideo=document.getElementById('remoteVideo');
+  var remotePlaceholder=document.getElementById('remotePlaceholder');
+  var startBtn=document.getElementById('startBtn');
+  var boothMessage=document.getElementById('boothMessage');
+  var countdownOverlay=document.getElementById('countdownOverlay');
+  var flashEl=document.getElementById('flashEl');
+  var shotCounter=document.getElementById('shotCounter');
+  var stripWrap=document.getElementById('stripWrap');
+  var stripCanvas=document.getElementById('stripCanvas');
+  var workCanvas=document.getElementById('workCanvas');
+  var downloadBtn=document.getElementById('downloadBtn');
+  var saveBtn=document.getElementById('saveBtn');
+  var retakeBtn=document.getElementById('retakeBtn');
+  var captionInput=document.getElementById('captionInput');
+  var galleryToggle=document.getElementById('galleryToggle');
+  var gallery=document.getElementById('gallery');
+  var galleryBody=document.getElementById('galleryBody');
+
+  var SHOT_COUNT=4;
+  var peer=null, conn=null, call=null;
+  var localStream=null, remoteStream=null;
+  var myShots=[], theirShots=[];
+  var myShotsReceived=false, theirShotsReceived=false;
+  var isGuest=false, remotePeerId=null;
+  var captureRound=0;
+
+  function showCard(card){
+    [landingCard,waitingCard,connectingCard,errorCard].forEach(function(c){ c.style.display='none'; });
+    if(card) card.style.display='block';
+  }
+  function showError(msg){
+    errorMsg.textContent = msg || 'Could not connect. Try refreshing, or check that you\'re both online.';
+    showCard(errorCard);
+    boothWrap.style.display='none';
+  }
+
+  async function getLocalStream(){
+    localStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+    localVideo.srcObject = localStream;
+  }
+
+  function setupPeer(onOpen){
+    peer = new Peer(undefined, { debug: 0 });
+    peer.on('open', function(id){ onOpen(id); });
+    peer.on('error', function(err){
+      console.error(err);
+      showError('Connection error: '+ (err && err.type ? err.type : 'unknown') +'. Try starting over.');
+    });
+    peer.on('connection', function(c){
+      conn = c;
+      wireDataConnection();
+    });
+    peer.on('call', function(incomingCall){
+      call = incomingCall;
+      call.answer(localStream);
+      call.on('stream', function(stream){ onRemoteStream(stream); });
+    });
+  }
+
+  function onRemoteStream(stream){
+    remoteStream = stream;
+    remoteVideo.srcObject = stream;
+    remoteVideo.style.display='block';
+    remotePlaceholder.style.display='none';
+  }
+
+  function wireDataConnection(){
+    conn.on('open', function(){
+      showCard(null);
+      boothWrap.style.display='block';
+      boothMessage.textContent = 'Connected. Waiting for both cameras to warm up…';
+      startBtn.disabled = false;
+    });
+    conn.on('data', handleData);
+    conn.on('close', function(){
+      showError('The connection with your partner closed.');
+    });
+  }
+
+  function handleData(msg){
+    if(msg.type==='tick'){
+      runLocalTick(msg.n, false);
+    } else if(msg.type==='shots'){
+      theirShots = msg.shots;
+      theirShotsReceived = true;
+      maybeBuildStrip();
+    } else if(msg.type==='caption'){
+      captionInput.value = msg.caption;
+    }
+  }
+
+  // ---- Landing: create booth (host) ----
+  createBtn.addEventListener('click', async function(){
+    createBtn.disabled = true;
+    try{
+      await getLocalStream();
+      setupPeer(function(id){
+        var link = location.origin + location.pathname + '?connect=' + id;
+        shareLink.textContent = link;
+        showCard(waitingCard);
+      });
+    }catch(err){
+      showError('Could not access your camera. Check your browser permissions and try again.');
+    }
+  });
+
+  copyLinkBtn.addEventListener('click', function(){
+    navigator.clipboard.writeText(shareLink.textContent).then(function(){
+      copyLinkBtn.textContent='Copied ✓';
+      setTimeout(function(){ copyLinkBtn.textContent='Copy link'; }, 1500);
+    }).catch(function(){});
+  });
+
+  retryBtn.addEventListener('click', function(){ location.href = location.origin + location.pathname; });
+
+  // ---- Guest flow: ?connect=ID in URL ----
+  var params = new URLSearchParams(location.search);
+  var joinId = params.get('connect');
+  if(joinId){
+    isGuest = true;
+    remotePeerId = joinId;
+    showCard(connectingCard);
+    (async function(){
+      try{
+        await getLocalStream();
+        setupPeer(function(){
+          conn = peer.connect(remotePeerId);
+          wireDataConnection();
+          call = peer.call(remotePeerId, localStream);
+          call.on('stream', function(stream){ onRemoteStream(stream); });
+        });
+      }catch(err){
+        showError('Could not access your camera. Check your browser permissions and try again.');
+      }
+    })();
+  }
+
+  // ---- Countdown + capture ----
+  startBtn.addEventListener('click', function(){
+    startBtn.disabled = true;
+    myShots = []; theirShots = []; myShotsReceived=false; theirShotsReceived=false;
+    stripWrap.style.display='none';
+    shotCounter.textContent = '0 / '+SHOT_COUNT;
+    boothMessage.textContent = 'Here we go…';
+    captureRound = 0;
+    nextRound();
+  });
+
+  function nextRound(){
+    if(captureRound >= SHOT_COUNT){
+      boothMessage.textContent = 'Sending your photos over…';
+      finishAndSend();
+      return;
+    }
+    countIn(3);
+  }
+
+  function countIn(n){
+    if(n < 0){
+      captureRound++;
+      shotCounter.textContent = captureRound+' / '+SHOT_COUNT;
+      setTimeout(nextRound, 700);
+      return;
+    }
+    runLocalTick(n, true);
+    setTimeout(function(){ countIn(n-1); }, 750);
+  }
+
+  function runLocalTick(n, isInitiator){
+    if(isInitiator && conn && conn.open){
+      conn.send({type:'tick', n: n});
+    }
+    if(n > 0){
+      countdownOverlay.textContent = n;
+      countdownOverlay.classList.remove('show');
+      void countdownOverlay.offsetWidth;
+      countdownOverlay.classList.add('show');
+    } else {
+      capture();
+    }
+  }
+
+  function capture(){
+    flashEl.classList.remove('go');
+    void flashEl.offsetWidth;
+    flashEl.classList.add('go');
+
+    var w = localVideo.videoWidth || 480;
+    var h = localVideo.videoHeight || 640;
+    workCanvas.width = w; workCanvas.height = h;
+    var ctx = workCanvas.getContext('2d');
+    ctx.save();
+    ctx.translate(w,0);
+    ctx.scale(-1,1);
+    ctx.drawImage(localVideo, 0,0,w,h);
+    ctx.restore();
+    myShots.push(workCanvas.toDataURL('image/jpeg', 0.72));
+  }
+
+  function finishAndSend(){
+    myShotsReceived = true;
+    if(conn && conn.open){
+      conn.send({type:'shots', shots: myShots});
+    }
+    boothMessage.textContent = 'Waiting for their photos to arrive…';
+    maybeBuildStrip();
+  }
+
+  function maybeBuildStrip(){
+    if(myShotsReceived && theirShotsReceived){
+      startBtn.disabled = false;
+      buildDuoStrip();
+    }
+  }
+
+  function loadImg(src){
+    return new Promise(function(resolve){
+      var img = new Image();
+      img.onload = function(){ resolve(img); };
+      img.src = src;
+    });
+  }
+
+  async function buildDuoStrip(){
+    var pairs = Math.min(myShots.length, theirShots.length);
+    var myImgs = await Promise.all(myShots.slice(0,pairs).map(loadImg));
+    var theirImgs = await Promise.all(theirShots.slice(0,pairs).map(loadImg));
+
+    var photoW=170, photoH=220, gap=10, pad=22, rowGap=14, captionH=60;
+    var rowW = photoW*2 + gap;
+    var totalW = rowW + pad*2;
+    var totalH = pad + (photoH+rowGap)*pairs + captionH;
+
+    stripCanvas.width = totalW;
+    stripCanvas.height = totalH;
+    var ctx = stripCanvas.getContext('2d');
+    ctx.fillStyle = '#f3e9d2';
+    ctx.fillRect(0,0,totalW,totalH);
+    ctx.fillStyle='rgba(0,0,0,0.02)';
+    for(var g=0; g<400; g++){ ctx.fillRect(Math.random()*totalW, Math.random()*totalH,1,1); }
+
+    for(var i=0;i<pairs;i++){
+      var y = pad + i*(photoH+rowGap);
+      ctx.fillStyle='#111';
+      ctx.fillRect(pad-4, y-4, rowW+8, photoH+8);
+      drawCover(ctx, myImgs[i], pad, y, photoW, photoH);
+      drawCover(ctx, theirImgs[i], pad+photoW+gap, y, photoW, photoH);
+    }
+
+    var capY = pad + (photoH+rowGap)*pairs + 34;
+    ctx.fillStyle='#2a221c';
+    ctx.font="20px 'Special Elite', monospace";
+    ctx.textAlign='center';
+    ctx.fillText((captionInput.value||'Photo Booth').trim(), totalW/2, capY);
+    ctx.font="11px 'Jost', sans-serif";
+    ctx.fillStyle='#6b5f4e';
+    ctx.fillText(new Date().toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}), totalW/2, capY+18);
+
+    stripWrap.style.display='flex';
+    boothMessage.textContent = 'Your strip is ready.';
+  }
+
+  function drawCover(ctx, img, x, y, w, h){
+    var ir = img.width/img.height, tr = w/h;
+    var sx,sy,sw,sh;
+    if(ir > tr){ sh=img.height; sw=sh*tr; sx=(img.width-sw)/2; sy=0; }
+    else{ sw=img.width; sh=sw/tr; sx=0; sy=(img.height-sh)/2; }
+    ctx.drawImage(img, sx,sy,sw,sh, x,y,w,h);
+  }
+
+  downloadBtn.addEventListener('click', function(){
+    var link=document.createElement('a');
+    link.download='duo-photo-strip-'+Date.now()+'.png';
+    link.href=stripCanvas.toDataURL('image/png');
+    link.click();
+  });
+
+  retakeBtn.addEventListener('click', function(){
+    stripWrap.style.display='none';
+    shotCounter.textContent='0 / '+SHOT_COUNT;
+    boothMessage.textContent='Whenever you\'re ready, start the countdown.';
+  });
+
+  // ---- Gallery (per-device, local to whichever browser saves) ----
+  saveBtn.addEventListener('click', async function(){
+    var id='duo:'+Date.now();
+    var dataUrl=stripCanvas.toDataURL('image/jpeg',0.85);
+    var entry={dataUrl:dataUrl, caption:captionInput.value||'Photo Booth', ts:Date.now()};
+    try{
+      var res=await window.storage.set(id, JSON.stringify(entry), false);
+      if(res){
+        saveBtn.textContent='Saved ✓';
+        setTimeout(function(){ saveBtn.textContent='Save to gallery'; },1500);
+        loadGallery();
+      }
+    }catch(e){
+      saveBtn.textContent='Could not save';
+      setTimeout(function(){ saveBtn.textContent='Save to gallery'; },1800);
+    }
+  });
+
+  async function loadGallery(){
+    try{
+      var listRes=await window.storage.list('duo:', false);
+      var keys=(listRes && listRes.keys)?listRes.keys:[];
+      if(keys.length===0){
+        galleryBody.innerHTML='<div class="gallery-empty">No strips saved yet on this device.</div>';
+        return;
+      }
+      var entries=[];
+      for(var i=0;i<keys.length;i++){
+        try{
+          var r=await window.storage.get(keys[i], false);
+          if(r && r.value){ var parsed=JSON.parse(r.value); parsed._key=keys[i]; entries.push(parsed); }
+        }catch(e){}
+      }
+      entries.sort(function(a,b){ return b.ts-a.ts; });
+      galleryBody.innerHTML='';
+      var scroll=document.createElement('div');
+      scroll.className='gallery-scroll';
+      entries.forEach(function(entry){
+        var item=document.createElement('div');
+        item.className='gallery-item';
+        item.innerHTML='<span class="peg">📌</span><img src="'+entry.dataUrl+'" alt="Saved duo photo strip">' +
+          '<button class="del">remove</button>';
+        item.querySelector('img').addEventListener('click', function(){
+          var link=document.createElement('a');
+          link.download='duo-photo-strip.png';
+          link.href=entry.dataUrl;
+          link.click();
+        });
+        item.querySelector('.del').addEventListener('click', async function(){
+          try{ await window.storage.delete(entry._key, false); loadGallery(); }catch(e){}
+        });
+        scroll.appendChild(item);
+      });
+      galleryBody.appendChild(scroll);
+    }catch(e){
+      galleryBody.innerHTML='<div class="gallery-empty">Gallery unavailable right now.</div>';
+    }
+  }
+
+  galleryToggle.addEventListener('click', function(){
+    gallery.classList.toggle('show');
+    galleryToggle.textContent=gallery.classList.contains('show')?'Hide the gallery':'View the gallery';
+    if(gallery.classList.contains('show')) loadGallery();
+  });
+
+})();
+</script>
+</body>
+</html>
